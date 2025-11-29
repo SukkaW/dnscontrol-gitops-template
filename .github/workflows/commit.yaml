@@ -1,0 +1,73 @@
+name: Commit DNS Changes
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "dnsconfig.js"
+  workflow_dispatch:
+
+jobs:
+  commit:
+    # set token permissions to allow creating commit comments
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    # ubuntu-slim is introduced by GitHub in October 2025, allows minimal job to be run within a container
+    # instead of full dedicated VM
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download DNSControl
+        run: |
+          wget https://github.com/StackExchange/dnscontrol/releases/download/v4.27.1/dnscontrol_4.27.1_linux_amd64.tar.gz -O dnscontrol.tar.gz
+          tar -xvf dnscontrol.tar.gz
+          chmod +x ./dnscontrol
+      - name: Push DNS changes
+        id: dnscontrol_push
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
+        # https://github.com/koenrh/dnscontrol-action/blob/58d7e41486784f703aef3d27cdc19e97c0d87da3/entrypoint.sh#L29C35-L29C63
+        run: |
+          set +e # continue on error
+
+          OUTPUT=$(./dnscontrol push 2>&1)
+          EXIT_CODE="$?"
+
+          echo "$OUTPUT"
+
+          FILTERED_OUTPUT=$(echo "$OUTPUT" | ./filter-preview-output.sh)
+
+          DELIMITER="DNSCONTROL-$RANDOM"
+          {
+            echo "output<<$DELIMITER"
+            echo "$OUTPUT"
+            echo "$DELIMITER"
+
+            echo "filtered_output<<$DELIMITER"
+            echo "$FILTERED_OUTPUT"
+            echo "$DELIMITER"
+
+            echo "exit_code<<$DELIMITER"
+            echo "$EXIT_CODE"
+            echo "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
+          exit 0
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Create commit comment
+        uses: peter-evans/commit-comment@v4
+        with:
+          body: |
+            ## DNS Push Output
+
+            exit code: ${{ steps.dnscontrol_push.outputs.exit_code }}
+
+            ```diff
+            ${{ steps.dnscontrol_push.outputs.filtered_output }}
+            ```
+      - name: Exit with proper dnspreview exit code
+        run: exit ${{ steps.dnscontrol_preview.outputs.exit_code }}

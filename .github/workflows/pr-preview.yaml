@@ -1,0 +1,102 @@
+name: Pull Request Preview
+on:
+  pull_request:
+
+jobs:
+  preview:
+    # set token permissions to allow creating pull request comments
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      # ubuntu-slim is introduced by GitHub in October 2025, allows minimal job to be run within a container
+      # instead of full dedicated VM
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download DNSControl
+        run: |
+          wget https://github.com/StackExchange/dnscontrol/releases/download/v4.27.1/dnscontrol_4.27.1_linux_amd64.tar.gz -O dnscontrol.tar.gz
+          tar -xvf dnscontrol.tar.gz
+          chmod +x ./dnscontrol
+      - name: Preview DNS changes
+        id: dnscontrol_preview
+        # https://github.com/koenrh/dnscontrol-action/blob/58d7e41486784f703aef3d27cdc19e97c0d87da3/entrypoint.sh#L29C35-L29C63
+        run: |
+          set +e # continue on error
+
+          OUTPUT=$(./dnscontrol preview 2>&1)
+          EXIT_CODE="$?"
+
+          echo "$OUTPUT"
+
+          FILTERED_OUTPUT=$(echo "$OUTPUT" | ./filter-preview-output.sh)
+
+          DELIMITER="DNSCONTROL-$RANDOM"
+          {
+            echo "output<<$DELIMITER"
+            echo "$OUTPUT"
+            echo "$DELIMITER"
+
+            echo "filtered_output<<$DELIMITER"
+            echo "$FILTERED_OUTPUT"
+            echo "$DELIMITER"
+
+            echo "exit_code<<$DELIMITER"
+            echo "$EXIT_CODE"
+            echo "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
+          exit 0
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # delete all comments previously made by this action to keep only the latest one
+      # find all comments containing "## DNS Changes Preview" and delete them
+      - name: Delete old preview comments
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prefix = "## DNS Changes Preview";
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.info("Not a pull_request event; skipping");
+              return;
+            }
+            const issue_number = pr.number;
+
+            // Get all comments (handles pagination)
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number }
+            );
+
+            const toDelete = comments.filter(c => c.body && c.body.startsWith(prefix));
+            core.info(`Found ${toDelete.length} comments to delete`);
+
+            for (const c of toDelete) {
+              // safety: only delete comments created by this bot/user
+              if (c.user && c.user.login !== 'github-actions[bot]') continue;
+              await github.rest.issues.deleteComment({
+                owner,
+                repo,
+                comment_id: c.id
+              });
+              core.info(`Deleted comment ${c.id}`);
+            }
+      - uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## DNS Changes Preview
+
+            exit code: ${{ steps.dnscontrol_preview.outputs.exit_code }}
+
+            ```diff
+            ${{ steps.dnscontrol_preview.outputs.filtered_output }}
+            ```
+          edit-mode: replace
+      - name: Exit with proper dnspreview exit code
+        run: exit ${{ steps.dnscontrol_preview.outputs.exit_code }}
