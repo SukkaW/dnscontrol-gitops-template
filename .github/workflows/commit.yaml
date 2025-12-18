@@ -32,10 +32,13 @@ jobs:
         run: |
           set +e # continue on error
 
-          OUTPUT=$(./dnscontrol push 2>&1)
-          EXIT_CODE="$?"
+          OUTPUT_TEMP_FILE=$(mktemp)
 
-          echo "$OUTPUT"
+          # Run the command: capture output to file AND print to console in realtime
+          (./dnscontrol push 2>&1; echo $?) | tee "$OUTPUT_TEMP_FILE"
+
+          OUTPUT=$(head -n -1 "$OUTPUT_TEMP_FILE")
+          EXIT_CODE=$(tail -n 1 "$OUTPUT_TEMP_FILE")
 
           FILTERED_OUTPUT=$(echo "$OUTPUT" | ./filter-preview-output.sh)
 
@@ -53,6 +56,8 @@ jobs:
             echo "$EXIT_CODE"
             echo "$DELIMITER"
           } >> "$GITHUB_OUTPUT"
+
+          rm -f "$OUTPUT_TEMP_FILE"
 
           exit 0
         env:
