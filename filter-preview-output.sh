@@ -12,7 +12,7 @@ grep -v -e '^\.\.\.0 corrections$' |\
   ## https://stackoverflow.com/questions/17998978/removing-colors-from-output
   sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g" |\
   #
-  # License MIT | SukkaW (https://skk.moe) | 2024 | https://github.com/SukkaW/dnscontrol-gitops-template
+  # License MIT | SukkaW (https://skk.moe) | https://github.com/SukkaW/dnscontrol-gitops-template
   # generate diff symbol for each line
   #
   # if contains "MODIFY", prefix this line with '! '
