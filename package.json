@@ -6,9 +6,9 @@
     "lint": "eslint --format=sukka ."
   },
   "devDependencies": {
-    "eslint": "^9.39.1",
-    "eslint-config-sukka": "^8.0.5",
-    "eslint-formatter-sukka": "^8.0.5",
+    "eslint": "^9.39.2",
+    "eslint-config-sukka": "^8.4.0",
+    "eslint-formatter-sukka": "^8.4.0",
     "typescript": "^5.9.3"
   }
 }
