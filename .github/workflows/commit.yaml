@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Download DNSControl
         run: |
-          wget https://github.com/StackExchange/dnscontrol/releases/download/v4.27.1/dnscontrol_4.27.1_linux_amd64.tar.gz -O dnscontrol.tar.gz
+          wget https://github.com/StackExchange/dnscontrol/releases/download/v4.32.0/dnscontrol_4.32.0_linux_amd64.tar.gz -O dnscontrol.tar.gz
           tar -xvf dnscontrol.tar.gz
           chmod +x ./dnscontrol
       - name: Push DNS changes
