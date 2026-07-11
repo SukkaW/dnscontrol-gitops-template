@@ -19,6 +19,10 @@ module.exports = require('eslint-config-sukka').sukka({
   rules: {
     // dnscontrol doesn not support const/let
     'no-var': 'off',
+    // dnscontrol does not support ES6 spread syntax
+    'prefer-spread': 'off',
+    // dnscontrol does not support modern ECMAScript syntax
+    'sukka/unicorn/logical-assignment-operators': 'off',
     // dnscontrol do not have bundler, there is no import
     '@typescript-eslint/triple-slash-reference': 'off',
     // dnscontrol uses otto, which means no ES6+, so no arrow functions
